@@ -1,11 +1,11 @@
 import qrcode
 from PIL import Image, ImageTk
-import pyzbar.pyzbar as pyzbar
+import cv2
 
 
 class QRCodeManager:
     def __init__(self):
-        self.qr_image = None  # To hold the generated QR code image
+        self.qr_image = None
 
     def generate_qr_code(self, data, size=(300, 300)):
         """
@@ -35,11 +35,16 @@ class QRCodeManager:
         self.qr_image.save(file_path)
 
     def decode_qr_code(self, image_path):
-        """
-        Decode the content of a QR code from an image file.
-        """
-        image = Image.open(image_path)
-        decoded_objects = pyzbar.decode(image)
-        if not decoded_objects:
-            raise ValueError("No QR code found in the image.")
-        return decoded_objects[0].data.decode("utf-8")
+            """
+            Decode the content of a QR code from an image file using OpenCV.
+            """
+            image = cv2.imread(image_path)
+            if image is None:
+                raise ValueError("Invalid image file or path.")
+
+            detector = cv2.QRCodeDetector()
+            data, points, _ = detector.detectAndDecode(image)
+
+            if not data:
+                raise ValueError("No QR code found in the image.")
+            return data
