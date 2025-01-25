@@ -1,0 +1,4 @@
+PyNaCl
+qrcode
+pillow
+opencv-python

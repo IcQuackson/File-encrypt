@@ -2,7 +2,9 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from encryption import chacha20_poly1305, ENCRYPT, REVERSE
 from qrcode_manager import QRCodeManager
+import platform
 
+MAX_CHARACTERS = 2174
 
 class EncryptDecryptApp:
 	def __init__(self, root):
@@ -21,11 +23,15 @@ class EncryptDecryptApp:
 
 	def center_window(self):
 		"""Center the window on the screen."""
-		screen_width = self.root.winfo_screenwidth()
+		# make window maximized, not resizable, set title and dont hide taskbar
+		# get max height
 		screen_height = self.root.winfo_screenheight()
-		x = (screen_width - self.window_width) // 2
-		y = (screen_height - self.window_height) // 2
-		self.root.geometry(f"{self.window_width}x{self.window_height}+{x}+{y}")
+		# get max width
+		screen_width = self.root.winfo_screenwidth()
+		# set window size
+		self.root.geometry(f"{screen_width}x{screen_height}+0+0")
+
+		self.root.resizable(True, True)
 
 	def create_widgets(self):
 		"""Create all widgets for the application."""
@@ -52,9 +58,29 @@ class EncryptDecryptApp:
 	def create_left_frame_widgets(self, frame):
 		"""Create all widgets for the left frame."""
 		# Center all widgets in this frame
+		# Text Label
 		tk.Label(frame, text="Text", font=("Arial", 14)).grid(row=0, column=0, sticky=tk.W, padx=10, pady=10)
-		self.text_entry = tk.Text(frame, height=15, font=("Arial", 12))
+
+		# Text Entry (Fixed Width)
+		self.text_entry = tk.Text(frame, height=15, width=50, font=("Arial", 12), wrap="word")
 		self.text_entry.grid(row=0, column=1, padx=10, pady=10, sticky=tk.W + tk.E)
+
+		# Scrollbar (Fixed Width)
+		text_entry_scrollbar = tk.Scrollbar(frame, command=self.text_entry.yview, width=15)  # Ensure width remains fixed
+		text_entry_scrollbar.grid(row=0, column=2, sticky="ns")  # No stretching
+		self.text_entry.config(yscrollcommand=text_entry_scrollbar.set)
+
+		# Character Counter Label (Fixed Width)
+		self.char_count_label = tk.Label(frame, text=f"0/{MAX_CHARACTERS}", font=("Arial", 12), width=10, anchor="e")
+		self.char_count_label.grid(row=1, column=2, padx=10, pady=10, sticky=tk.W)
+
+		# Bind Text Modification
+		self.text_entry.bind("<<Modified>>", self.update_char_count)
+
+		# Prevent column resizing
+		frame.grid_columnconfigure(0, weight=0)  # Label
+		frame.grid_columnconfigure(1, weight=1)  # Text Box (Expandable)
+		frame.grid_columnconfigure(2, weight=0)  # Scrollbar (Fixed)
 
 		# Add scrollbar to the text entry
 		text_entry_scrollbar = tk.Scrollbar(frame, command=self.text_entry.yview)
@@ -71,7 +97,6 @@ class EncryptDecryptApp:
 		self.mode_var = tk.StringVar(value=ENCRYPT)
 		mode_frame = ttk.Frame(frame)
 		mode_frame.grid(row=2, column=1, sticky=tk.W, padx=10, pady=10)
-
 
 		# Add radio buttons to the mode frame
 		mode_frame = tk.Frame(frame)
@@ -103,6 +128,38 @@ class EncryptDecryptApp:
 		result_text_scrollbar.grid(row=3, column=2, sticky="nsew")
 		self.result_text.config(yscrollcommand=result_text_scrollbar.set)
 
+	def update_char_count(self, event):
+		"""Update the character count label, enforce limit, and disable QR save if exceeded."""
+
+		# Prevent redundant execution
+		if not self.text_entry.edit_modified():
+			return  # Skip if nothing actually changed
+
+		text = self.text_entry.get("1.0", tk.END).strip()
+		char_count = len(text)
+		
+		if char_count > MAX_CHARACTERS:
+			self.text_entry.tag_remove("warning", "1.0", tk.END)
+			self.text_entry.tag_add("warning", "1.0", "end")
+
+			# Create tooltip only if it doesn't already exist
+			if not hasattr(self, "tooltip") or not self.tooltip.winfo_exists():
+				self.tooltip = tk.Label(self.text_entry, 
+										text=f"No QRCode if {MAX_CHARACTERS} characters limit exceeded!", 
+										bg="yellow", relief="solid")
+				self.tooltip.place(relx=1.0, rely=0, anchor="ne")
+
+			self.save_button.config(state=tk.DISABLED)
+		else:
+			self.text_entry.tag_remove("warning", "1.0", tk.END)
+			# Destroy tooltip if it exists
+			if hasattr(self, "tooltip") and self.tooltip.winfo_exists():
+				self.tooltip.destroy()
+				del self.tooltip  # Remove attribute to avoid stale references
+		
+		self.char_count_label.config(text=f"{char_count}/{MAX_CHARACTERS}")
+		self.text_entry.edit_modified(False)
+			
 	def create_right_frame_widgets(self, frame):
 		"""Create all widgets for the right frame."""
 		# Center all widgets in this frame
@@ -141,7 +198,7 @@ class EncryptDecryptApp:
 			result = chacha20_poly1305(user_key, user_text, selected_mode)
 			self.result_text.insert(tk.END, result)
 
-			if selected_mode == ENCRYPT:
+			if selected_mode == ENCRYPT and len(user_text) <= MAX_CHARACTERS:
 				self.save_button.config(state=tk.NORMAL)
 				self.qr_manager.generate_qr_code(result)
 				qr_tk_image = self.qr_manager.get_qr_tk_image()
