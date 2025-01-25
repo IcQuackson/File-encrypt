@@ -7,15 +7,15 @@ class QRCodeManager:
     def __init__(self):
         self.qr_image = None
 
-    def generate_qr_code(self, data, size=(300, 300)):
+    def generate_qr_code(self, data, size=(600, 600)):
         """
         Generate a QR code from the provided data and store it as an Image.
         """
-        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
+        qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=20, border=4)
         qr.add_data(data)
         qr.make(fit=True)
         self.qr_image = qr.make_image(fill_color="black", back_color="white")
-        self.qr_image = self.qr_image.resize(size, Image.Resampling.LANCZOS)
+        self.qr_image = self.qr_image.resize(size, Image.Resampling.NEAREST)
         return self.qr_image
 
     def get_qr_tk_image(self):
@@ -32,6 +32,9 @@ class QRCodeManager:
         """
         if not self.qr_image:
             raise ValueError("No QR code image available. Please generate one first.")
+        
+
+
         self.qr_image.save(file_path)
 
     def decode_qr_code(self, image_path):
